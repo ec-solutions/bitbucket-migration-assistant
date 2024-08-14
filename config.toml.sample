@@ -9,6 +9,7 @@ access_token = ""
 organisation = ""
 
 [migration]
+temp_folder = "/tmp"
 repositories = [
     { name = "plisseexperten-wp", rename_to = "plisseexperten-wordpress" },
     { name = "moll-wenden-website", rename_to = "moll-wenden-wordpress" },

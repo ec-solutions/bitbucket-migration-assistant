@@ -1,27 +1,14 @@
 import tomllib
 import requests
-from requests.auth import HTTPBasicAuth
+import subprocess
+from pathlib import Path
+from typing import Optional
 from rich import print
+from rich.progress import Progress
+from requests.auth import HTTPBasicAuth
 
-
-def parse_config(file) -> dict:
-    with open(file, "rb") as toml_data:
-        data = tomllib.load(toml_data)
-
-    return data
-
-
-def extract_repositories(repositories: list) -> list:
-    formatted = []
-    for repo in repositories:
-        formatted.append({
-            "name": repo["name"],
-            "created_on": repo["created_on"],
-            "description": repo["description"],
-            # "links": repo["links"],
-        })
-
-    return formatted
+from lib.config import Repository, BitbucketRepository
+from lib.config import get_config
 
 
 def get_bitbucket_page(request_url: str, authentication: HTTPBasicAuth):
@@ -32,22 +19,39 @@ def get_bitbucket_page(request_url: str, authentication: HTTPBasicAuth):
         return False
 
 
-def get_bitbucket_repositories(username: str, password: str, organisation: str,):
-    repositories = []
-    authentication = HTTPBasicAuth(username, password)
-    request_url = f"https://api.bitbucket.org/2.0/repositories/{organisation}/?pagelen=100"
-    response = get_bitbucket_page(request_url, authentication)
+def get_bitbucket_repositories() -> list[BitbucketRepository]:
+    bitbucket = get_config().bitbucket
 
-    if response is not False:
-        extract_repositories(response["values"])
-        repositories.extend(extract_repositories(response["values"]))
-        while "next" in response:
-            response = get_bitbucket_page(response["next"], authentication)
-            repositories.extend(extract_repositories(response["values"]))
+    repositories: list[BitbucketRepository] = []
+    authentication = HTTPBasicAuth(bitbucket.username, bitbucket.app_password)
+    request_url = f"https://api.bitbucket.org/2.0/repositories/{bitbucket.organisation}/?pagelen=100"
+
+    while True:
+        response = get_bitbucket_page(request_url, authentication)
+        if response is False:
+            break
+
+        for repo in response["values"]:
+            repositories.append(BitbucketRepository(
+                name=repo["name"],
+                created_on=repo["created_on"],
+                description=repo["description"],
+                url=f"https://{bitbucket.username}:{bitbucket.app_password}@bitbucket.org/{bitbucket.organisation}/{repo["slug"]}.git"
+            ))
+
+        if "next" not in response:
+            break
+
+        request_url = response["next"]
 
     return repositories
 
 
-def filter_repositories(repositories: list, whitelist: list):
-    whitelist_names = {x["name"] for x in whitelist}
-    return [x for x in repositories if x["name"] in whitelist_names]
+def migrate_repository(repository: BitbucketRepository, progress: Optional[Progress] = None):
+    config = get_config()
+    repo_path = config.temp_folder / repository.name
+    task = progress.add_task(repository.name, status="Cloning", total=3)
+    # subprocess.run()
+    print(repository.url)
+
+    progress.update(task, status="Creating new repository", advance=1)
