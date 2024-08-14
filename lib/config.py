@@ -19,7 +19,7 @@ class GitHub(SimpleNamespace):
 
 class Repository(SimpleNamespace):
     name: str
-    rename_to: str
+    rename_to: str = None
 
 
 class BitbucketRepository(SimpleNamespace):
@@ -32,7 +32,7 @@ class BitbucketRepository(SimpleNamespace):
 class Config(SimpleNamespace):
     bitbucket: Bitbucket
     github: GitHub
-    temp_folder: str
+    temp_folder: Path
     repositories: list[Repository]
 
 

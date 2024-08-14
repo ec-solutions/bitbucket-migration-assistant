@@ -33,7 +33,7 @@ def get_bitbucket_repositories() -> list[BitbucketRepository]:
 
         for repo in response["values"]:
             repositories.append(BitbucketRepository(
-                name=repo["name"],
+                name=repo["slug"],
                 created_on=repo["created_on"],
                 description=repo["description"],
                 url=f"https://{bitbucket.username}:{bitbucket.app_password}@bitbucket.org/{bitbucket.organisation}/{repo["slug"]}.git"
@@ -50,8 +50,30 @@ def get_bitbucket_repositories() -> list[BitbucketRepository]:
 def migrate_repository(repository: BitbucketRepository, progress: Optional[Progress] = None):
     config = get_config()
     repo_path = config.temp_folder / repository.name
-    task = progress.add_task(repository.name, status="Cloning", total=3)
-    # subprocess.run()
-    print(repository.url)
+    task = progress.add_task(repository.name, status="cloning", total=3)
+    subprocess.run(["git", "clone", "--mirror", repository.url, repo_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    progress.update(task, status="Creating new repository", advance=1)
+    progress.update(task, status="preparing GitHub", advance=1)
+    response = requests.post(
+        f"https://api.github.com/orgs/{config.github.organisation}/repos",
+        headers={
+            "Authorization": f"Bearer {config.github.access_token}",
+            "Accept": "application/vnd.github+json"
+        },
+        json={
+            "name": next(x.rename_to for x in config.repositories if x.name == repository.name) or repository.name,
+            "description": repository.description,
+            "private": True,
+        }
+    )
+
+    if not response.ok:
+        progress.update(task, status="[bold red]failed[/bold red]")
+        # Potential error handling or feedback?
+        return
+
+    progress.update(task, status="migrating", advance=1)
+    subprocess.run()
+
+
+    progress.update(task, status="completed", advance=1)

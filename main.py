@@ -5,7 +5,7 @@ import time
 import typer
 from rich import print
 import concurrent.futures
-from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn, MofNCompleteColumn
+from rich.progress import Progress, TextColumn, BarColumn, TimeElapsedColumn, MofNCompleteColumn, SpinnerColumn
 
 from lib import callbacks, helpers
 from lib.config import load_config, get_config
@@ -25,14 +25,11 @@ def main(
     print(f"Provided configuration file: {config_file}")
     print(f"Provided temporary folder: {temp_folder}")
 
-    progress_columns = (
-        TextColumn("[progress.description]{task.description}"),
+    print("\n[cyan]Attempting to retrieve all BitBucket repositories...")
+    with Progress(
         BarColumn(),
         TimeElapsedColumn(),
-    )
-
-    print("\n[cyan]Attempting to retrieve all BitBucket repositories...")
-    with Progress(*progress_columns) as progress:
+    ) as progress:
         fetching = progress.add_task("", total=None)
 
         repositories = helpers.get_bitbucket_repositories()
@@ -44,16 +41,23 @@ def main(
         print("Unfortunately, no repositories could be found.")
 
     if len(repositories) > 0:
+        print(repositories)
         whitelist_names = {x.name for x in config.repositories}
         filtered_repos = [x for x in repositories if x.name in whitelist_names]
 
         print(f"\n[cyan]Processing repositories. Only {len(filtered_repos)} slated for migration...[/cyan]")
-        with Progress(MofNCompleteColumn(), *progress_columns) as progress:
-            migration = progress.add_task("", total=len(filtered_repos))
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description} ({task.fields[status]})"),
+            MofNCompleteColumn(),
+            BarColumn(),
+            TimeElapsedColumn(),
+        ) as progress:
+            # migration = progress.add_task("", total=len(filtered_repos), status=Mig)
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for repo in filtered_repos:
                     executor.submit(helpers.migrate_repository, repo, progress)
-                    progress.advance(migration)
+                    # progress.advance(migration)
 
 
 if __name__ == "__main__":
