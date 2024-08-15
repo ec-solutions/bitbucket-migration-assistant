@@ -1,13 +1,11 @@
-import tomllib
+import shutil
 import requests
 import subprocess
-from pathlib import Path
 from typing import Optional
-from rich import print
 from rich.progress import Progress
 from requests.auth import HTTPBasicAuth
 
-from lib.config import Repository, BitbucketRepository
+from lib.config import BitbucketRepository
 from lib.config import get_config
 
 
@@ -21,7 +19,6 @@ def get_bitbucket_page(request_url: str, authentication: HTTPBasicAuth):
 
 def get_bitbucket_repositories() -> list[BitbucketRepository]:
     bitbucket = get_config().bitbucket
-
     repositories: list[BitbucketRepository] = []
     authentication = HTTPBasicAuth(bitbucket.username, bitbucket.app_password)
     request_url = f"https://api.bitbucket.org/2.0/repositories/{bitbucket.organisation}/?pagelen=100"
@@ -50,10 +47,19 @@ def get_bitbucket_repositories() -> list[BitbucketRepository]:
 def migrate_repository(repository: BitbucketRepository, progress: Optional[Progress] = None):
     config = get_config()
     repo_path = config.temp_folder / repository.name
-    task = progress.add_task(repository.name, status="cloning", total=3)
+
+    task = progress.add_task(repository.name, status="cloning", total=5)
+
+    if repo_path.exists():
+        progress.update(task, status="[bold cyan]skipping[/bold cyan]", completed=5)
+        return
+
+    # Clone repository
     subprocess.run(["git", "clone", "--mirror", repository.url, repo_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    progress.update(task, status="preparing GitHub", advance=1)
+    # Create repository on GitHub
+    progress.update(task, status="preparing", advance=1)
+    repo_name = next(x.rename_to for x in config.repositories if x.name == repository.name) or repository.name
     response = requests.post(
         f"https://api.github.com/orgs/{config.github.organisation}/repos",
         headers={
@@ -61,19 +67,48 @@ def migrate_repository(repository: BitbucketRepository, progress: Optional[Progr
             "Accept": "application/vnd.github+json"
         },
         json={
-            "name": next(x.rename_to for x in config.repositories if x.name == repository.name) or repository.name,
+            "name": repo_name,
             "description": repository.description,
             "private": True,
         }
     )
 
     if not response.ok:
-        progress.update(task, status="[bold red]failed[/bold red]")
-        # Potential error handling or feedback?
+        # print(f"Failed to create GitHub repository with the following message: {response.content}")
+        if response.status_code == 422:
+            progress.update(task, status="[bold red]repo already exists[/bold red]")
+        else:
+            progress.update(task, status="[bold red]permission error[/bold red]")
         return
 
+    # Migrate repository to GitHub
     progress.update(task, status="migrating", advance=1)
-    subprocess.run()
+    remote_url = response.json()["clone_url"].replace("https://", f"https://{config.github.username}:{config.github.access_token}@")
+    subprocess.run(["git", "remote", "add", "github", remote_url], cwd=repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["git", "push", "github", "--all"], cwd=repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+    # Verify that the repository now has content
+    progress.update(task, status="verifying", advance=1)
+    response = requests.get(
+        f"https://api.github.com/repos/{config.github.organisation}/{repo_name}",
+        headers={
+            "Authorization": f"Bearer {config.github.access_token}",
+            "Accept": "application/vnd.github+json"
+        }
+    )
 
-    progress.update(task, status="completed", advance=1)
+    if not response.ok:
+        progress.update(task, status="[bold red]failed to verify[/bold red]")
+        return
+
+    if response.json()["size"] > 0:
+        progress.update(task, status="[bold green]verified[/bold green]")
+    else:
+        progress.update(task, status="[bold red]empty repo[/bold red]")
+
+    # Cleaning up
+    progress.update(task, status="cleaning", advance=1)
+    shutil.rmtree(repo_path, ignore_errors=True)
+
+    # Success!
+    progress.update(task, status="[bold green]completed[/bold green]", advance=1)

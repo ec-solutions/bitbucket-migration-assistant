@@ -41,23 +41,15 @@ def main(
         print("Unfortunately, no repositories could be found.")
 
     if len(repositories) > 0:
-        print(repositories)
         whitelist_names = {x.name for x in config.repositories}
         filtered_repos = [x for x in repositories if x.name in whitelist_names]
 
         print(f"\n[cyan]Processing repositories. Only {len(filtered_repos)} slated for migration...[/cyan]")
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description} ({task.fields[status]})"),
-            MofNCompleteColumn(),
-            BarColumn(),
-            TimeElapsedColumn(),
-        ) as progress:
-            # migration = progress.add_task("", total=len(filtered_repos), status=Mig)
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                for repo in filtered_repos:
-                    executor.submit(helpers.migrate_repository, repo, progress)
-                    # progress.advance(migration)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for repo in filtered_repos:
+                executor.submit(helpers.migrate_repository, repo, progress)
+
+        print(f"\n Thank you for using the EC Solutions Bitbucket Migration Assistant!")
 
 
 if __name__ == "__main__":
