@@ -12,7 +12,6 @@ from lib.config import load_config, get_config
 
 def main(
     config_file: Annotated[Path, typer.Argument(help="The path of the configuration file")],
-    temp_folder: Annotated[Path, typer.Argument(help="The path of the temporary migration folder")],
 ):
     """
     This application is a migration assistant for transferring repositories from BitBucket to your GitHub organisation.
@@ -22,7 +21,7 @@ def main(
 
     print("Welcome to the [bold green]Bitbucket to GitHub Migration Tool[/bold green]!")
     print(f"Provided configuration file: {config_file}")
-    print(f"Provided temporary folder: {temp_folder}")
+    print(f"Provided temporary folder: {config.temp_folder}")
 
     print("\n[cyan]Attempting to retrieve all BitBucket repositories...")
     with Progress(
