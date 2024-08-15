@@ -11,7 +11,7 @@ organisation = ""
 [migration]
 temp_folder = "/tmp"
 repositories = [
-    { name = "plisseexperten-wp", rename_to = "plisseexperten-wordpress" },
-    { name = "moll-wenden-website", rename_to = "moll-wenden-wordpress" },
+    { name = "old-repo-slug" },
+    { name = "old-repo-slug", rename_to = "new-repo-slug" },
 ]
 
