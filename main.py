@@ -54,6 +54,7 @@ def main(
                 for repo in filtered_repos:
                     executor.submit(helpers.migrate_repository, repo, progress)
 
+        # TODO Implement total progress and final result list with messages/error for each migration.
         print(f"\nThank you for using the EC Solutions Bitbucket Migration Assistant!")
 
 

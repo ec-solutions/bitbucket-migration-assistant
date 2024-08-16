@@ -78,9 +78,10 @@ def migrate_repository(repository: BitbucketRepository, progress: Optional[Progr
     if not response.ok:
         # print(f"Failed to create GitHub repository with the following message: {response.content}")
         if response.status_code == 422:
-            progress.update(task, status="[bold red]repo already exists[/bold red]")
+            # TODO: Repos have failed because of newlines in description. Needs general error handling...
+            progress.update(task, status="[red]error 422[/red]")
         else:
-            progress.update(task, status="[bold red]permission error[/bold red]")
+            progress.update(task, status="[red]permission error[/red]")
         return
 
     # Migrate repository to GitHub
@@ -88,6 +89,7 @@ def migrate_repository(repository: BitbucketRepository, progress: Optional[Progr
     remote_url = response.json()["clone_url"].replace("https://", f"https://{config.github.username}:{config.github.access_token}@")
     subprocess.run(["git", "remote", "add", "github", remote_url], cwd=repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(["git", "push", "github", "--all"], cwd=repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # TODO: Needs error handling because repos that have large files (> 100 MB) will not push but still return success.
 
     # Verify that the repository now has content
     progress.update(task, status="verifying", advance=1)
@@ -103,10 +105,14 @@ def migrate_repository(repository: BitbucketRepository, progress: Optional[Progr
         progress.update(task, status="[bold red]failed to verify[/bold red]")
         return
 
+    # TODO: Needs to be verified
     if response.json()["size"] > 0:
         progress.update(task, status="[bold green]verified[/bold green]")
     else:
         progress.update(task, status="[bold red]empty repo[/bold red]")
+        # TODO: Handle empty repo. Failed migration.
+
+    # TODO: Add support for archiving repo based on config archive = true...
 
     # Cleaning up
     progress.update(task, status="cleaning", advance=1)
