@@ -48,7 +48,9 @@ def get_bitbucket_repositories() -> list[BitbucketRepository]:
 def migrate_repository(repository: BitbucketRepository, progress: Optional[Progress] = None):
     config = get_config()
     repo_path = config.temp_folder / repository.name
+    repo_name = next(x.rename_to for x in config.repositories if x.name == repository.name) or repository.name
 
+    # TODO: Validate if repo_name already exists on GitHub...
     task = progress.add_task(repository.name, status="cloning", total=5)
 
     if repo_path.exists():
@@ -60,7 +62,6 @@ def migrate_repository(repository: BitbucketRepository, progress: Optional[Progr
 
     # Create repository on GitHub
     progress.update(task, status="preparing", advance=1)
-    repo_name = next(x.rename_to for x in config.repositories if x.name == repository.name) or repository.name
     response = requests.post(
         f"https://api.github.com/orgs/{config.github.organisation}/repos",
         headers={
