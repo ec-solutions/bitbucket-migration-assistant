@@ -1,6 +1,8 @@
 ## Bitbucket to GitHub Migration Assistant
 Welcome to the EC Solutions migration assistant for transferring repositories from Bitbucket to GitHub. This tool was developed since we ourselves started using GitHub instead of Bitbucket and had years worth of repositories, but could not find any publicly available tools to migrate them.
 
+> **Important:** This tool will not work with repositories that contain large files (> 100MB) since GitHub refuses to accept them. GitHub LFS needs to be used for these purposes.
+
 ### Installation
 To get started, simply clone the repository and open a terminal in the root directory of the repository.
 
