@@ -51,8 +51,15 @@ def main(
             TimeElapsedColumn(),
         ) as progress:
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                for repo in filtered_repos:
-                    executor.submit(helpers.migrate_repository, repo, progress)
+                futures = [executor.submit(helpers.migrate_repository, repo, progress)
+                           for repo in filtered_repos]
+
+                for f in concurrent.futures.as_completed(futures):
+                    try:
+                        f.result()
+                    except Exception:
+                        import traceback
+                        traceback.print_exc()
 
         # TODO Implement total progress and final result list with messages/error for each migration.
         print(f"\nThank you for using the EC Solutions Bitbucket Migration Assistant!")
